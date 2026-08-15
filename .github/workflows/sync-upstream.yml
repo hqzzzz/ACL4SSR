@@ -1,0 +1,34 @@
+name: Sync from upstream
+
+on:
+  schedule:
+    # 每天 UTC 02:00 = 北京时间 10:00
+    # 上游 AutoUpdate 每天约 UTC 01:11 提交,此时间确保拉到当天更新
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Merge upstream master and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/ACL4SSR/ACL4SSR.git
+          git fetch upstream master
+          # fork 独有的文件(如 Clash/config/ACL4SSR_LL.ini)在上游不存在,
+          # merge 不会覆盖/删除它。仅当上游未来添加同名文件时才可能冲突。
+          git merge --no-edit upstream/master || {
+            echo "::error::Merge conflict with upstream. Resolve manually on local, then push."
+            git merge --abort
+            exit 1
+          }
+          git push origin master
